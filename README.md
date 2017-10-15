@@ -9,7 +9,7 @@ In your server, you can do the following:
 ```go
 ln, err := net.Listen("tcp", *addr)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 for {
@@ -19,11 +19,11 @@ for {
 		continue
 	}
 
-    cn, err = conn.WithProxyProtocol(cn)
-    if err != nil {
-        log.Println("NewProxyConn():", err)
-        continue
-    }
+	cn, err = viaproxy.Wrap(cn)
+	if err != nil {
+		log.Println("Wrap():", err)
+		continue
+	}
 
 	go handle(cn)
 }
@@ -32,9 +32,9 @@ for {
 Given that one can forget about this, you can also do:
 
 ```go
-ln, err := listen.WithProxyProtocol("tcp", *addr)
+ln, err := viaproxy.Listen("tcp", *addr)
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
 
 for {

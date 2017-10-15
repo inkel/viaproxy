@@ -1,14 +1,12 @@
-package listen
+package viaproxy
 
 import (
 	"net"
-
-	"github.com/inkel/go-proxy-protocol/conn"
 )
 
-// WithProxyProtocol returns a net.Listener that will wrap Accept so
-// it returns net.Conn that know how to work with Proxy Protocol.
-func WithProxyProtocol(network, address string) (net.Listener, error) {
+// Listen returns a net.Listener that will wrap Accept so it returns
+// net.Conn that know how to work with Proxy Protocol.
+func Listen(network, address string) (net.Listener, error) {
 	ln, err := net.Listen(network, address)
 	if err != nil {
 		return nil, err
@@ -28,7 +26,7 @@ func (l *listener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 
-	cn, err = conn.WithProxyProtocol(cn)
+	cn, err = Wrap(cn)
 	if err != nil {
 		return nil, err
 	}

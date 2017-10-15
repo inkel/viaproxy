@@ -1,4 +1,4 @@
-package conn
+package viaproxy
 
 import (
 	"bufio"
@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// WithProxyProtocol returns a net.Conn that knows how to properly
-// identify the remote address if it comes via a proxy that supports
-// the Proxy Protocol.
-func WithProxyProtocol(cn net.Conn) (net.Conn, error) {
+// Wrap takes a net.Conn and returns a net.Conn that knows how to
+// properly identify the remote address if it comes via a proxy that
+// supports the Proxy Protocol.
+func Wrap(cn net.Conn) (net.Conn, error) {
 	c := &conn{cn: cn, r: bufio.NewReader(cn)}
 	if err := c.init(); err != nil {
 		return nil, err
