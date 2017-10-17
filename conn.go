@@ -33,7 +33,6 @@ type conn struct {
 	proxied bool
 }
 
-func (c *conn) LocalAddr() net.Addr  { return c.local }
 func (c *conn) RemoteAddr() net.Addr { return c.remote }
 
 func (c *conn) Read(b []byte) (int, error) { return c.r.Read(b) }
