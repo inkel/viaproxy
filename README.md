@@ -1,4 +1,7 @@
 # Proxy Protocol support for Go net.Conn
+
+[![GoDoc](https://godoc.org/github.com/inkel/viaproxy?status.svg)](https://godoc.org/github.com/inkel/viaproxy) [![Go Report Card](https://goreportcard.com/badge/github.com/inkel/viaproxy)](https://goreportcard.com/report/github.com/inkel/viaproxy)
+
 Regular Go `net` doesn't support [Proxy Protocol](http://www.haproxy.com/blog/haproxy/proxy-protocol/) when being load balanced with this option enabled. This makes you loose the original remote address and will report the load balancer's address instead on `net.Conn.RemoteAddr()`.  This package adds allows you to create `net.Conn` objects that know how to understand Proxy Protocol.
 
 You can read more about this in my [Proxy Protocol: what is it and how to use it with Go](https://inkel.github.io/posts/proxy-protocol/) article.
