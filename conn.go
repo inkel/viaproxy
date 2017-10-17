@@ -28,17 +28,18 @@ func Wrap(cn net.Conn) (net.Conn, error) {
 type conn struct {
 	net.Conn
 	r       *bufio.Reader
-	local   net.Addr
+	proxy   net.Addr
 	remote  net.Addr
 	proxied bool
 }
 
+func (c *conn) ProxyAddr() net.Addr  { return c.proxy }
 func (c *conn) RemoteAddr() net.Addr { return c.remote }
 
 func (c *conn) Read(b []byte) (int, error) { return c.r.Read(b) }
 
 func (c *conn) init() error {
-	c.local = c.Conn.LocalAddr()
+	c.proxy = c.Conn.LocalAddr()
 	c.remote = c.Conn.RemoteAddr()
 
 	buf, err := c.r.Peek(6)
@@ -82,7 +83,7 @@ func (c *conn) init() error {
 	}
 
 	c.remote = &net.TCPAddr{IP: clientIP, Port: clientPort}
-	c.local = &net.TCPAddr{IP: proxyIP, Port: proxyPort}
+	c.proxy = &net.TCPAddr{IP: proxyIP, Port: proxyPort}
 
 	return nil
 }
