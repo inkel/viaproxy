@@ -3,11 +3,17 @@ package viaproxy
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
+
+// ErrInvalidProxyProtocolHeader is the error returned by Wrap when the proxy
+// protocol header is malformed.
+var ErrInvalidProxyProtocolHeader = errors.New("invalid proxy protocol header")
 
 // Wrap takes a net.Conn and returns a net.Conn that knows how to
 // properly identify the remote address if it comes via a proxy that
@@ -41,29 +47,51 @@ func (c *conn) RemoteAddr() net.Addr { return c.remote }
 func (c *conn) Read(b []byte) (int, error) { return c.r.Read(b) }
 
 func (c *conn) init() error {
-	buf, err := c.r.Peek(5)
+	c.local = c.cn.LocalAddr()
+	c.remote = c.cn.RemoteAddr()
+
+	buf, err := c.r.Peek(6)
 	if err != io.EOF && err != nil {
 		return err
 	}
 
-	if err == nil && bytes.Equal([]byte(`PROXY`), buf) {
-		c.proxied = true
-		proxyLine, err := c.r.ReadString('\n')
-		if err != nil {
-			return err
-		}
-		fields := strings.Fields(proxyLine)
-		c.remote = &addr{net.JoinHostPort(fields[2], fields[4])}
-		c.local = &addr{net.JoinHostPort(fields[3], fields[5])}
-	} else {
-		c.local = c.cn.LocalAddr()
-		c.remote = c.cn.RemoteAddr()
+	if err == io.EOF {
+		return nil
 	}
+
+	if !bytes.Equal([]byte("PROXY "), buf) {
+		return nil
+	}
+
+	c.proxied = true
+	proxyLine, err := c.r.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	fields := strings.Fields(proxyLine)
+
+	if len(fields) == 2 && fields[1] == "UNKNOWN" {
+		return nil
+	}
+
+	if len(fields) != 6 {
+		return ErrInvalidProxyProtocolHeader
+	}
+
+	clientIP := net.ParseIP(fields[2])
+	clientPort, err := strconv.Atoi(fields[4])
+	if clientIP == nil || err != nil {
+		return ErrInvalidProxyProtocolHeader
+	}
+
+	proxyIP := net.ParseIP(fields[3])
+	proxyPort, err := strconv.Atoi(fields[5])
+	if proxyIP == nil || err != nil {
+		return ErrInvalidProxyProtocolHeader
+	}
+
+	c.remote = &net.TCPAddr{IP: clientIP, Port: clientPort}
+	c.local = &net.TCPAddr{IP: proxyIP, Port: proxyPort}
 
 	return nil
 }
-
-type addr struct{ hp string }
-
-func (a addr) Network() string { return "tcp" }
-func (a addr) String() string  { return a.hp }
