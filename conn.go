@@ -8,7 +8,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // ErrInvalidProxyProtocolHeader is the error returned by Wrap when the proxy
@@ -19,7 +18,7 @@ var ErrInvalidProxyProtocolHeader = errors.New("invalid proxy protocol header")
 // properly identify the remote address if it comes via a proxy that
 // supports the Proxy Protocol.
 func Wrap(cn net.Conn) (net.Conn, error) {
-	c := &conn{cn: cn, r: bufio.NewReader(cn)}
+	c := &conn{Conn: cn, r: bufio.NewReader(cn)}
 	if err := c.init(); err != nil {
 		return nil, err
 	}
@@ -27,19 +26,12 @@ func Wrap(cn net.Conn) (net.Conn, error) {
 }
 
 type conn struct {
-	cn      net.Conn
+	net.Conn
 	r       *bufio.Reader
 	local   net.Addr
 	remote  net.Addr
 	proxied bool
 }
-
-func (c *conn) Close() error                { return c.cn.Close() }
-func (c *conn) Write(b []byte) (int, error) { return c.cn.Write(b) }
-
-func (c *conn) SetDeadline(t time.Time) error      { return c.cn.SetDeadline(t) }
-func (c *conn) SetReadDeadline(t time.Time) error  { return c.cn.SetReadDeadline(t) }
-func (c *conn) SetWriteDeadline(t time.Time) error { return c.cn.SetWriteDeadline(t) }
 
 func (c *conn) LocalAddr() net.Addr  { return c.local }
 func (c *conn) RemoteAddr() net.Addr { return c.remote }
@@ -47,8 +39,8 @@ func (c *conn) RemoteAddr() net.Addr { return c.remote }
 func (c *conn) Read(b []byte) (int, error) { return c.r.Read(b) }
 
 func (c *conn) init() error {
-	c.local = c.cn.LocalAddr()
-	c.remote = c.cn.RemoteAddr()
+	c.local = c.Conn.LocalAddr()
+	c.remote = c.Conn.RemoteAddr()
 
 	buf, err := c.r.Peek(6)
 	if err != io.EOF && err != nil {
