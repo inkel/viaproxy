@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"testing"
 
@@ -90,5 +91,31 @@ func TestWrap(t *testing.T) {
 				t.Errorf("expecting ProxyAddr() %v, got %v", c.proxy, pcn.ProxyAddr())
 			}
 		})
+	}
+}
+
+func Example() {
+	// Listen on TCP port 8080 for connections coming from a proxy that sends
+	// the Proxy Protocol header.
+	l, err := viaproxy.Listen("tcp", ":8080")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer l.Close()
+
+	for {
+		// Wait for a connection.
+		conn, err := l.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// The connection should be safe to be converted to a *viaproxy.Conn
+		// structure.
+		cn := conn.(*viaproxy.Conn)
+		log.Printf("remote address is: %v", cn.RemoteAddr())
+		log.Printf("local address is: %v", cn.LocalAddr())
+		log.Printf("proxy address is: %v", cn.ProxyAddr())
+		cn.Close()
 	}
 }
