@@ -24,6 +24,9 @@ func Wrap(cn net.Conn) (net.Conn, error) {
 	return c, nil
 }
 
+// Conn is an implementation of net.Conn interface for TCP connections that come
+// from a proxy that users the Proxy Protocol to communicate with the upstream
+// servers.
 type Conn struct {
 	net.Conn
 	r       *bufio.Reader
@@ -32,8 +35,10 @@ type Conn struct {
 	proxied bool
 }
 
+// ProxyAddr returns the proxy remote network address.
 func (c *Conn) ProxyAddr() net.Addr { return c.proxy }
 
+// RemoteAddr returns the remote network address.
 func (c *Conn) RemoteAddr() net.Addr {
 	if c.remote != nil {
 		return c.remote
@@ -41,6 +46,7 @@ func (c *Conn) RemoteAddr() net.Addr {
 	return c.Conn.RemoteAddr()
 }
 
+// Read reads data from the connection.
 func (c *Conn) Read(b []byte) (int, error) { return c.r.Read(b) }
 
 func (c *Conn) init() error {
