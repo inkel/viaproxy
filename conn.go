@@ -3,11 +3,10 @@ package viaproxy
 import (
 	"bufio"
 	"bytes"
-	"errors"
-	"io"
 	"net"
 	"strconv"
-	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // ErrInvalidProxyProtocolHeader is the error returned by Wrap when the proxy
@@ -18,14 +17,14 @@ var ErrInvalidProxyProtocolHeader = errors.New("invalid proxy protocol header")
 // properly identify the remote address if it comes via a proxy that
 // supports the Proxy Protocol.
 func Wrap(cn net.Conn) (net.Conn, error) {
-	c := &conn{Conn: cn, r: bufio.NewReader(cn)}
+	c := &Conn{Conn: cn, r: bufio.NewReader(cn)}
 	if err := c.init(); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
-type conn struct {
+type Conn struct {
 	net.Conn
 	r       *bufio.Reader
 	proxy   net.Addr
@@ -33,53 +32,92 @@ type conn struct {
 	proxied bool
 }
 
-func (c *conn) ProxyAddr() net.Addr  { return c.proxy }
-func (c *conn) RemoteAddr() net.Addr { return c.remote }
+func (c *Conn) ProxyAddr() net.Addr { return c.proxy }
 
-func (c *conn) Read(b []byte) (int, error) { return c.r.Read(b) }
-
-func (c *conn) init() error {
-	c.proxy = c.Conn.LocalAddr()
-	c.remote = c.Conn.RemoteAddr()
-
-	buf, err := c.r.Peek(6)
-	if err != io.EOF && err != nil {
-		return err
+func (c *Conn) RemoteAddr() net.Addr {
+	if c.remote != nil {
+		return c.remote
 	}
+	return c.Conn.RemoteAddr()
+}
 
-	if err == io.EOF {
+func (c *Conn) Read(b []byte) (int, error) { return c.r.Read(b) }
+
+func (c *Conn) init() error {
+	unknown := []byte("PROXY UNKNOWN\r\n")
+	buf, err := c.r.Peek(len(unknown))
+	if err != nil {
+		return errors.Wrap(err, "parsing proxy protocol header")
+	}
+	if bytes.Equal(buf, unknown) {
+		c.r.Discard(len(unknown))
 		return nil
 	}
 
-	if !bytes.Equal([]byte("PROXY "), buf) {
-		return nil
-	}
-
-	c.proxied = true
-	proxyLine, err := c.r.ReadString('\n')
+	// PROXY
+	buf = make([]byte, 6)
+	_, err = c.r.Read(buf)
 	if err != nil {
 		return err
 	}
-	fields := strings.Fields(proxyLine)
-
-	if len(fields) == 2 && fields[1] == "UNKNOWN" {
-		return nil
+	if !bytes.Equal(buf, []byte("PROXY ")) {
+		return errors.Errorf("invalid proxy protocol header prefix: %v", buf)
 	}
 
-	if len(fields) != 6 {
-		return ErrInvalidProxyProtocolHeader
+	// TCP4 || TCP6
+	buf = make([]byte, 5)
+	_, err = c.r.Read(buf)
+	if err != nil {
+		return errors.Wrap(err, "invalid proxy protocol header")
+	}
+	if !bytes.Equal([]byte("TCP4 "), buf) && !bytes.Equal([]byte("TCP6 "), buf) {
+		return errors.Errorf("unrecognized protocol: %q", buf)
 	}
 
-	clientIP := net.ParseIP(fields[2])
-	clientPort, err := strconv.Atoi(fields[4])
-	if clientIP == nil || err != nil {
-		return ErrInvalidProxyProtocolHeader
+	// CLIENT IP
+	p, err := c.r.ReadString(' ')
+	if err != nil {
+		return errors.Wrap(err, "invalid proxy protocol header while reading client ip")
+	}
+	clientIP := net.ParseIP(p[:len(p)-1])
+	if clientIP == nil {
+		return errors.Errorf("cannot parse client ip %q", p)
 	}
 
-	proxyIP := net.ParseIP(fields[3])
-	proxyPort, err := strconv.Atoi(fields[5])
-	if proxyIP == nil || err != nil {
-		return ErrInvalidProxyProtocolHeader
+	// PROXY IP
+	p, err = c.r.ReadString(' ')
+	if err != nil {
+		return errors.Wrap(err, "invalid proxy protocol header while reading proxyt ip")
+	}
+	proxyIP := net.ParseIP(p[:len(p)-1])
+	if proxyIP == nil {
+		return errors.Errorf("cannot parse proxy ip %q", p)
+	}
+
+	// CLIENT PORT
+	p, err = c.r.ReadString(' ')
+	if err != nil {
+		return errors.Wrap(err, "invalid proxy protocol header while reading client port")
+	}
+	clientPort, err := strconv.Atoi(p[:len(p)-1])
+	if err != nil {
+		return errors.Wrap(err, "invalid proxy protocol header parsing client port")
+	}
+
+	// PROXY PORT
+	p, err = c.r.ReadString('\r')
+	if err != nil {
+		return errors.Wrap(err, "invalid proxy protocol header while reading proxy port")
+	}
+	proxyPort, err := strconv.Atoi(p[:len(p)-1])
+	if err != nil {
+		return errors.Wrap(err, "invalid proxy protocol header parsing proxy port")
+	}
+
+	// Trailing
+	b, err := c.r.ReadByte()
+	if err != nil || b != '\n' {
+		return errors.Wrap(err, "invalid trailing")
 	}
 
 	c.remote = &net.TCPAddr{IP: clientIP, Port: clientPort}
