@@ -56,8 +56,8 @@ func (c *Conn) init() error {
 		return errors.Wrap(err, "parsing proxy protocol header")
 	}
 	if bytes.Equal(buf, unknown) {
-		c.r.Discard(len(unknown))
-		return nil
+		_, err = c.r.Discard(len(unknown))
+		return err
 	}
 
 	// PROXY
