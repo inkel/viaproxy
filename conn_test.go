@@ -55,9 +55,7 @@ func TestWrap(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(string(c.line), func(t *testing.T) {
-			cn := testConn(c.line)
-
-			cn, err := viaproxy.Wrap(cn)
+			cn, err := viaproxy.Wrap(testConn(c.line))
 			if c.err && err == nil {
 				t.Fatal("expecting error, got nil")
 			}
@@ -83,12 +81,8 @@ func TestWrap(t *testing.T) {
 				t.Errorf("expecting data %q, got %q", c.data, data)
 			}
 
-			pcn, ok := cn.(*viaproxy.Conn)
-			if !ok {
-				t.Fatalf("cannot cast connection to *viaproxy.Conn")
-			}
-			if !equalAddr(pcn.ProxyAddr(), c.proxy) {
-				t.Errorf("expecting ProxyAddr() %v, got %v", c.proxy, pcn.ProxyAddr())
+			if !equalAddr(cn.ProxyAddr(), c.proxy) {
+				t.Errorf("expecting ProxyAddr() %v, got %v", c.proxy, cn.ProxyAddr())
 			}
 		})
 	}
