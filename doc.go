@@ -5,7 +5,7 @@ Proxy Protocol defined by Willy Tarreau for HAProxy.
 Regular net.Conn structures will return the "wrong" RemoteAddr when used behind a proxy:
 the remote address informed will be the one of the proxy, not the one from the client
 initiating the connection to the proxy. This package adds a wrapper for regular net.Conn
-that checks for the existance of the proxy protocol line and if present, return a net.Conn
+that checks for the existence of the proxy protocol line and if present, return a net.Conn
 that reports the customer address when calling RemoteAddr. This wrapped connection can be
 casted to *viaproxy.Conn to add access to an additional ProxyAddr method that will return
 the proxy's address.
