@@ -88,7 +88,7 @@ func TestWrap(t *testing.T) {
 	}
 }
 
-func Example() {
+func ExampleListener_Accept() {
 	// Listen on TCP port 8080 for connections coming from a proxy that sends
 	// the Proxy Protocol header.
 	l, err := viaproxy.Listen("tcp", ":8080")
@@ -113,3 +113,27 @@ func Example() {
 		cn.Close()
 	}
 }
+
+func ExampleListener_AcceptFromProxy() {
+	// Listen on TCP port 8080 for connections coming from a proxy that sends
+	// the Proxy Protocol header.
+	l, err := viaproxy.Listen("tcp", ":8080")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer l.Close()
+
+	for {
+		// Wait for a connection.
+		cn, err := l.AcceptFromProxy()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Printf("remote address is: %v", cn.RemoteAddr())
+		log.Printf("local address is: %v", cn.LocalAddr())
+		log.Printf("proxy address is: %v", cn.ProxyAddr())
+		cn.Close()
+	}
+}
+

@@ -6,30 +6,39 @@ import (
 
 // Listen returns a net.Listener that will wrap Accept so it returns
 // net.Conn that know how to work with Proxy Protocol.
-func Listen(network, address string) (net.Listener, error) {
+func Listen(network, address string) (*Listener, error) {
 	ln, err := net.Listen(network, address)
 	if err != nil {
 		return nil, err
 	}
 
-	return &listener{ln}, nil
+	return &Listener{ln}, nil
 }
 
-type listener struct{ ln net.Listener }
+// Listener is a wrap on net.Listener that returns wrapped Conn
+// objects.
+type Listener struct{ ln net.Listener }
 
-func (l *listener) Close() error   { return l.ln.Close() }
-func (l *listener) Addr() net.Addr { return l.ln.Addr() }
+// Close stops listening on the TCP address. Already Accepted
+// connections are not closed.
+func (l *Listener) Close() error { return l.ln.Close() }
 
-func (l *listener) Accept() (net.Conn, error) {
+// Addr returns the listener's network address, a *TCPAddr. The Addr
+// returned is shared by all invocations of Addr, so do not modify it.
+func (l *Listener) Addr() net.Addr { return l.ln.Addr() }
+
+// Accept implements the Accept method in the Listener interface; it
+// waits for the next call and returns a generic Conn.
+func (l *Listener) Accept() (net.Conn, error) {
+	return l.AcceptFromProxy()
+}
+
+// AcceptFromProxy accepts the next incoming call and returns the new
+// connection.
+func (l *Listener) AcceptFromProxy() (*Conn, error) {
 	cn, err := l.ln.Accept()
 	if err != nil {
 		return nil, err
 	}
-
-	cn, err = Wrap(cn)
-	if err != nil {
-		return nil, err
-	}
-
-	return cn, nil
+	return Wrap(cn)
 }
