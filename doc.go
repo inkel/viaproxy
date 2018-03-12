@@ -12,40 +12,77 @@ the proxy's address.
 
 In order to use this extended connection type we can call Wrap on an existing connection:
 
-	ln, err := net.Listen("tcp", ":8080")
+	ln, err := net.Listen("tcp", *addr)
 	if err != nil {
-		// handle error
+		log.Fatal(err)
 	}
+
 	for {
-		conn, err := ln.Accept()
+		cn, err := ln.Accept()
 		if err != nil {
-			// handle error
+			log.Println("ln.Accept():", err)
+			continue
 		}
 
-		conn, err = viaproxy.Wrap(conn)
+		pcn, err := viaproxy.Wrap(cn)
 		if err != nil {
-			// handler error
+			log.Println("Wrap():", err)
+			continue
 		}
 
-		cn := conn.(*viaproxy.Conn)
-		log.Println(cn.ProxyAddr())
+		log.Printf("remote address is: %v", pcn.RemoteAddr())
+		log.Printf("local address is: %v", pcn.LocalAddr())
+		log.Printf("proxy address is: %v", pcn.ProxyAddr())
+		pcn.Close()
 	}
 
 Package viaproxy also provides a Listener struct that already returns viaproxy.Conn
-connections when calling Accept:
+connections when calling AcceptFromProxy:
 
-	ln, err := viaproxy.Listen("tcp", ":8080")
+	ln, err := viaproxy.Listen("tcp", *addr)
 	if err != nil {
-		// handle error
+		log.Fatal(err)
 	}
+
 	for {
-		conn, err := ln.Accept()
+		cn, err := ln.AcceptFromProxy()
 		if err != nil {
-			// handle error
+			log.Println("ln.Accept():", err)
+			continue
 		}
 
-		cn := conn.(*viaproxy.Conn)
-		log.Println(cn.ProxyAddr())
+		log.Printf("remote address is: %v", cn.RemoteAddr())
+		log.Printf("local address is: %v", cn.LocalAddr())
+		log.Printf("proxy address is: %v", cn.ProxyAddr())
+		cn.Close()
 	}
+
+The Accept method in the Listener struct returns a generic net.Conn
+which can safely be casted to a viaproxy.Conn:
+
+	ln, err := viaproxy.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		cn, err := ln.Accept()
+		if err != nil {
+			log.Println("ln.Accept():", err)
+			continue
+		}
+
+		// The connection should be safe to be converted to a *viaproxy.Conn
+		// structure.
+		pcn := conn.(*viaproxy.Conn)
+		log.Printf("remote address is: %v", pcn.RemoteAddr())
+		log.Printf("local address is: %v", pcn.LocalAddr())
+		log.Printf("proxy address is: %v", pcn.ProxyAddr())
+		pcn.Close()
+	}
+
+Using viaproxy.Conn objects whenever a net.Conn is expected should be
+safe in all cases. If you encounter an issue please send a bug report
+to https://github.com/inkel/viaproxy/issues
 */
 package viaproxy
