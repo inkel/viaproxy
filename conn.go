@@ -10,10 +10,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// ErrInvalidProxyProtocolHeader is the error returned by Wrap when the proxy
-// protocol header is malformed.
-var ErrInvalidProxyProtocolHeader = errors.New("invalid proxy protocol header")
-
 // Wrap takes a net.Conn and returns a pointer to Conn that knows how to
 // properly identify the remote address if it comes via a proxy that
 // supports the Proxy Protocol.
