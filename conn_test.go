@@ -51,6 +51,15 @@ func TestWrap(t *testing.T) {
 		{[]byte("PROXY TCP4 192.168.1.20 10.X.0.1 5678 1234\r\n"), nil, "", -1, nil, true},
 		{[]byte("PROXY TCP4 192.168.1.20 10.0.0.1 567X 1234\r\n"), nil, "", -1, nil, true},
 		{[]byte("PROXY TCP4 192.168.1.20 10.0.0.1 5678 123X\r\n"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP4 192.168.1.20 10.0.0.1 5678\r\nfoo\r\nbar\r\n"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP4 192.168.1.20 10.0.0.1 5678 1234"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP4 192.168.1.20 10.0.0.1 5678 1234\r"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP4 192.168.1.20 10.0.0.1"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP4 192.168.1.20"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP 192.168.1.20 10.0.0.1 5678 1234\r\n"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP\r\n192.168.1.20 10.0.0.1 5678 1234\r\n"), nil, "", -1, nil, true},
+		{[]byte("PROXY TCP4"), nil, "", -1, nil, true},
+		{[]byte(""), nil, "", -1, nil, true},
 	}
 
 	for _, c := range cases {

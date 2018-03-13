@@ -63,9 +63,20 @@ func (c *Conn) SetWriteDeadline(t time.Time) error { return c.cn.SetWriteDeadlin
 // Write implements the Conn Write method.
 func (c *Conn) Write(b []byte) (int, error) { return c.cn.Write(b) }
 
+var unknown = []byte("UNKNOWN\r\n")
+
 func (c *Conn) init() error {
-	unknown := []byte("PROXY UNKNOWN\r\n")
-	buf, err := c.r.Peek(len(unknown))
+	// PROXY
+	buf := make([]byte, 6)
+	n, err := c.r.Read(buf)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(buf, []byte("PROXY ")) {
+		return errors.Errorf("invalid proxy protocol header prefix: %q", buf[:n])
+	}
+
+	buf, err = c.r.Peek(len(unknown))
 	if err != nil {
 		return errors.Wrap(err, "parsing proxy protocol header")
 	}
@@ -74,64 +85,36 @@ func (c *Conn) init() error {
 		return err
 	}
 
-	// PROXY
-	buf = make([]byte, 6)
-	_, err = c.r.Read(buf)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(buf, []byte("PROXY ")) {
-		return errors.Errorf("invalid proxy protocol header prefix: %v", buf)
-	}
-
 	// TCP4 || TCP6
 	buf = make([]byte, 5)
-	_, err = c.r.Read(buf)
-	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header")
-	}
+	// This line cannot return error as the buffer of the *bufio.Reader already contains at least five characters from the call to Peek above.
+	c.r.Read(buf)
 	if !bytes.Equal([]byte("TCP4 "), buf) && !bytes.Equal([]byte("TCP6 "), buf) {
 		return errors.Errorf("unrecognized protocol: %q", buf)
 	}
 
 	// CLIENT IP
-	p, err := c.r.ReadString(' ')
+	clientIP, err := c.readIP()
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading client ip")
-	}
-	clientIP := net.ParseIP(p[:len(p)-1])
-	if clientIP == nil {
-		return errors.Errorf("cannot parse client ip %q", p)
+		return errors.Wrap(err, "cannot parse client IP")
 	}
 
 	// PROXY IP
-	p, err = c.r.ReadString(' ')
+	proxyIP, err := c.readIP()
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading proxyt ip")
-	}
-	proxyIP := net.ParseIP(p[:len(p)-1])
-	if proxyIP == nil {
-		return errors.Errorf("cannot parse proxy ip %q", p)
+		return errors.Wrap(err, "cannot parse proxy IP")
 	}
 
 	// CLIENT PORT
-	p, err = c.r.ReadString(' ')
+	clientPort, err := c.readPort(' ')
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading client port")
-	}
-	clientPort, err := strconv.Atoi(p[:len(p)-1])
-	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header parsing client port")
+		return errors.Wrap(err, "cannot parse client port")
 	}
 
 	// PROXY PORT
-	p, err = c.r.ReadString('\r')
+	proxyPort, err := c.readPort('\r')
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading proxy port")
-	}
-	proxyPort, err := strconv.Atoi(p[:len(p)-1])
-	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header parsing proxy port")
+		return errors.Wrap(err, "cannot parse proxy port")
 	}
 
 	// Trailing
@@ -144,4 +127,32 @@ func (c *Conn) init() error {
 	c.proxy = &net.TCPAddr{IP: proxyIP, Port: proxyPort}
 
 	return nil
+}
+
+func (c *Conn) readIP() (net.IP, error) {
+	p, err := c.r.ReadString(' ')
+	if err != nil {
+		return nil, err
+	}
+
+	ip := net.ParseIP(p[:len(p)-1])
+	if ip == nil {
+		return nil, errors.Errorf("cannot parse IP %q", p)
+	}
+
+	return ip, nil
+}
+
+func (c *Conn) readPort(delim byte) (int, error) {
+	p, err := c.r.ReadString(delim)
+	if err != nil {
+		return 0, err
+	}
+
+	port, err := strconv.Atoi(p[:len(p)-1])
+	if err != nil {
+		return 0, err
+	}
+
+	return port, nil
 }
