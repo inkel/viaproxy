@@ -63,9 +63,20 @@ func (c *Conn) SetWriteDeadline(t time.Time) error { return c.cn.SetWriteDeadlin
 // Write implements the Conn Write method.
 func (c *Conn) Write(b []byte) (int, error) { return c.cn.Write(b) }
 
+var unknown = []byte("UNKNOWN\r\n")
+
 func (c *Conn) init() error {
-	unknown := []byte("PROXY UNKNOWN\r\n")
-	buf, err := c.r.Peek(len(unknown))
+	// PROXY
+	buf := make([]byte, 6)
+	n, err := c.r.Read(buf)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(buf, []byte("PROXY ")) {
+		return errors.Errorf("invalid proxy protocol header prefix: %q", buf[:n])
+	}
+
+	buf, err = c.r.Peek(len(unknown))
 	if err != nil {
 		return errors.Wrap(err, "parsing proxy protocol header")
 	}
@@ -74,22 +85,10 @@ func (c *Conn) init() error {
 		return err
 	}
 
-	// PROXY
-	buf = make([]byte, 6)
-	_, err = c.r.Read(buf)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(buf, []byte("PROXY ")) {
-		return errors.Errorf("invalid proxy protocol header prefix: %v", buf)
-	}
-
 	// TCP4 || TCP6
 	buf = make([]byte, 5)
-	_, err = c.r.Read(buf)
-	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header")
-	}
+	// This line cannot return error as the buffer of the *bufio.Reader already contains at least five characters from the call to Peek above.
+	c.r.Read(buf)
 	if !bytes.Equal([]byte("TCP4 "), buf) && !bytes.Equal([]byte("TCP6 "), buf) {
 		return errors.Errorf("unrecognized protocol: %q", buf)
 	}
