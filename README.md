@@ -22,17 +22,20 @@ for {
 		continue
 	}
 
-	cn, err = viaproxy.Wrap(cn)
+	pcn, err := viaproxy.Wrap(cn)
 	if err != nil {
 		log.Println("Wrap():", err)
 		continue
 	}
 
-	go handle(cn)
+	log.Printf("remote address is: %v", pcn.RemoteAddr())
+	log.Printf("local address is: %v", pcn.LocalAddr())
+	log.Printf("proxy address is: %v", pcn.ProxyAddr())
+	pcn.Close()
 }
 ```
 
-Given that one can forget about this, you can also do:
+Given that one can forget about this, you can also do the following:
 
 ```go
 ln, err := viaproxy.Listen("tcp", *addr)
@@ -47,7 +50,37 @@ for {
 		continue
 	}
 
-	go handle(cn)
+	// The connection should be safe to be converted to a *viaproxy.Conn
+	// structure.
+	pcn := conn.(*viaproxy.Conn)
+	log.Printf("remote address is: %v", pcn.RemoteAddr())
+	log.Printf("local address is: %v", pcn.LocalAddr())
+	log.Printf("proxy address is: %v", pcn.ProxyAddr())
+	pcn.Close()
+}
+```
+
+In this case, `Accept` returns a generic [`net.Conn`](https://golang.org/pkg/net/#Conn) object. If you want to directly use a `Conn` object (which satisfies the `net.Conn` interface), you can use `AcceptFromProxy` instead:
+
+```go
+ln, err := viaproxy.Listen("tcp", *addr)
+if err != nil {
+	log.Fatal(err)
+}
+
+for {
+	cn, err := ln.AcceptFromProxy()
+	if err != nil {
+		log.Println("ln.Accept():", err)
+		continue
+	}
+
+	// The connection should be safe to be converted to a *viaproxy.Conn
+	// structure.
+	log.Printf("remote address is: %v", cn.RemoteAddr())
+	log.Printf("local address is: %v", cn.LocalAddr())
+	log.Printf("proxy address is: %v", cn.ProxyAddr())
+	cn.Close()
 }
 ```
 
