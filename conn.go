@@ -95,43 +95,27 @@ func (c *Conn) init() error {
 	}
 
 	// CLIENT IP
-	p, err := c.r.ReadString(' ')
+	clientIP, err := c.readIP()
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading client ip")
-	}
-	clientIP := net.ParseIP(p[:len(p)-1])
-	if clientIP == nil {
-		return errors.Errorf("cannot parse client ip %q", p)
+		return errors.Wrap(err, "cannot parse client IP")
 	}
 
 	// PROXY IP
-	p, err = c.r.ReadString(' ')
+	proxyIP, err := c.readIP()
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading proxyt ip")
-	}
-	proxyIP := net.ParseIP(p[:len(p)-1])
-	if proxyIP == nil {
-		return errors.Errorf("cannot parse proxy ip %q", p)
+		return errors.Wrap(err, "cannot parse proxy IP")
 	}
 
 	// CLIENT PORT
-	p, err = c.r.ReadString(' ')
+	clientPort, err := c.readPort(' ')
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading client port")
-	}
-	clientPort, err := strconv.Atoi(p[:len(p)-1])
-	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header parsing client port")
+		return errors.Wrap(err, "cannot parse client port")
 	}
 
 	// PROXY PORT
-	p, err = c.r.ReadString('\r')
+	proxyPort, err := c.readPort('\r')
 	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header while reading proxy port")
-	}
-	proxyPort, err := strconv.Atoi(p[:len(p)-1])
-	if err != nil {
-		return errors.Wrap(err, "invalid proxy protocol header parsing proxy port")
+		return errors.Wrap(err, "cannot parse proxy port")
 	}
 
 	// Trailing
@@ -144,4 +128,32 @@ func (c *Conn) init() error {
 	c.proxy = &net.TCPAddr{IP: proxyIP, Port: proxyPort}
 
 	return nil
+}
+
+func (c *Conn) readIP() (net.IP, error) {
+	p, err := c.r.ReadString(' ')
+	if err != nil {
+		return nil, err
+	}
+
+	ip := net.ParseIP(p[:len(p)-1])
+	if ip == nil {
+		return nil, errors.Errorf("cannot parse IP %q", p)
+	}
+
+	return ip, nil
+}
+
+func (c *Conn) readPort(delim byte) (int, error) {
+	p, err := c.r.ReadString(delim)
+	if err != nil {
+		return 0, err
+	}
+
+	port, err := strconv.Atoi(p[:len(p)-1])
+	if err != nil {
+		return 0, err
+	}
+
+	return port, nil
 }
