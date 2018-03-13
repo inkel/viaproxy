@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -17,7 +18,7 @@ var ErrInvalidProxyProtocolHeader = errors.New("invalid proxy protocol header")
 // properly identify the remote address if it comes via a proxy that
 // supports the Proxy Protocol.
 func Wrap(cn net.Conn) (*Conn, error) {
-	c := &Conn{Conn: cn, r: bufio.NewReader(cn)}
+	c := &Conn{cn: cn, r: bufio.NewReader(cn)}
 	if err := c.init(); err != nil {
 		return nil, err
 	}
@@ -28,7 +29,7 @@ func Wrap(cn net.Conn) (*Conn, error) {
 // from a proxy that users the Proxy Protocol to communicate with the upstream
 // servers.
 type Conn struct {
-	net.Conn
+	cn      net.Conn
 	r       *bufio.Reader
 	proxy   net.Addr
 	remote  net.Addr
@@ -43,11 +44,29 @@ func (c *Conn) RemoteAddr() net.Addr {
 	if c.remote != nil {
 		return c.remote
 	}
-	return c.Conn.RemoteAddr()
+	return c.cn.RemoteAddr()
 }
+
+// LocalAddr returns the local network address.
+func (c *Conn) LocalAddr() net.Addr { return c.cn.LocalAddr() }
 
 // Read reads data from the connection.
 func (c *Conn) Read(b []byte) (int, error) { return c.r.Read(b) }
+
+// Close closes the connection.
+func (c *Conn) Close() error { return c.cn.Close() }
+
+// SetDeadline implements the Conn SetDeadline method.
+func (c *Conn) SetDeadline(t time.Time) error { return c.cn.SetDeadline(t) }
+
+// SetReadDeadline implements the Conn SetReadDeadline method.
+func (c *Conn) SetReadDeadline(t time.Time) error { return c.cn.SetReadDeadline(t) }
+
+// SetWriteDeadline implements the Conn SetWriteDeadline method.
+func (c *Conn) SetWriteDeadline(t time.Time) error { return c.cn.SetWriteDeadline(t) }
+
+// Write implements the Conn Write method.
+func (c *Conn) Write(b []byte) (int, error) { return c.cn.Write(b) }
 
 func (c *Conn) init() error {
 	unknown := []byte("PROXY UNKNOWN\r\n")
