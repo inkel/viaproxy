@@ -29,11 +29,10 @@ func Wrap(cn net.Conn) (*Conn, error) {
 // from a proxy that users the Proxy Protocol to communicate with the upstream
 // servers.
 type Conn struct {
-	cn      net.Conn
-	r       *bufio.Reader
-	proxy   net.Addr
-	remote  net.Addr
-	proxied bool
+	cn     net.Conn
+	r      *bufio.Reader
+	proxy  net.Addr
+	remote net.Addr
 }
 
 // ProxyAddr returns the proxy remote network address.
